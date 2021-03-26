@@ -11,19 +11,30 @@ if [ "${running}" != 'true' ]; then
     registry:2
 fi
 
+# connect the registry to the cluster network
+# (the network may already be connected)
+docker network connect "kind" "${reg_name}" || true
+
+n=0
+reg_ip=""
+# get the ip of the registry in the kind network
+# retry for two minutes until the ip address is present
+while [ "$n" -lt 24 ] && [ -z "${reg_ip}" ]
+do
+  reg_ip="$(docker inspect -f '{{ (index .NetworkSettings.Networks "kind").IPAddress }}' "${reg_name}" || echo "")"
+  n=$((n+1))
+  sleep 5
+done
+
 # create a cluster with the local registry enabled in containerd
 cat <<EOF | kind create cluster --config=-
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 containerdConfigPatches:
 - |-
-  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:${reg_port}"]
-    endpoint = ["http://${reg_name}:${reg_port}"]
+  [plugins."io.containerd.grpc.v1.cri".registry.mirrors."${reg_ip}:${reg_port}"]
+    endpoint = ["http://${reg_ip}:${reg_port}"]
 EOF
-
-# connect the registry to the cluster network
-# (the network may already be connected)
-docker network connect "kind" "${reg_name}" || true
 
 # Document the local registry
 # https://github.com/kubernetes/enhancements/tree/master/keps/sig-cluster-lifecycle/generic/1755-communicating-a-local-registry
@@ -35,7 +46,6 @@ metadata:
   namespace: kube-public
 data:
   localRegistryHosting.v1: |
-    host: "localhost:${reg_port}"
+    host: "${reg_ip}:${reg_port}"
     help: "https://kind.sigs.k8s.io/docs/user/local-registry/"
 EOF
-

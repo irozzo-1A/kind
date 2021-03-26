@@ -25,7 +25,8 @@ The registry can be used like this.
 1. First we'll pull an image `docker pull gcr.io/google-samples/hello-app:1.0`
 2. Then we'll tag the image to use the local registry `docker tag gcr.io/google-samples/hello-app:1.0 localhost:5000/hello-app:1.0`
 3. Then we'll push it to the registry `docker push localhost:5000/hello-app:1.0`
-4. And now we can use the image `kubectl create deployment hello-server --image=localhost:5000/hello-app:1.0`
+4. Obtain the IP of the registry in the kind network `kind_registry=$(docker inspect -f '{{ (index .NetworkSettings.Networks "kind").IPAddress }}' kind-registry)`
+5. And now we can use the image `kubectl create deployment hello-server --image=${kind_registry}:5000/hello-app:1.0`
 
 If you build your own image and tag it like `localhost:5000/image:foo` and then use
-it in kubernetes as `localhost:5000/image:foo`.
+it in kubernetes as `${kind_registry}:5000/image:foo`.
